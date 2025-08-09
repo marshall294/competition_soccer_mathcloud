@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Match Manager</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f4f4f4;
+    }
+    h1 {
+      text-align: center;
+    }
+    form, .match-list {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 40px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    button {
+      padding: 10px 20px;
+      background: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    .match {
+      border-bottom: 1px solid #ccc;
+      padding: 10px 0;
+    }
+    .match:last-child {
+      border-bottom: none;
+    }
+    .actions button {
+      background: #dc3545;
+      margin-left: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Admin Match Manager</h1>
+
+  <form id="matchForm">
+    <input type="hidden" id="matchId" />
+
+    <label>Competition Name:</label>
+    <input type="text" id="competition" required />
+
+    <label>Match Type (League, Cup, Quarter-Final, Friendly):</label>
+    <input type="text" id="matchType" required />
+
+    <label>Team A Name:</label>
+    <input type="text" id="teamA" required />
+
+    <label>Team A Logo URL:</label>
+    <input type="text" id="logoA" />
+
+    <label>Team B Name:</label>
+    <input type="text" id="teamB" required />
+
+    <label>Team B Logo URL:</label>
+    <input type="text" id="logoB" />
+
+    <label>Match Date:</label>
+    <input type="date" id="matchDate" required />
+
+    <label>Match Time:</label>
+    <input type="time" id="matchTime" required />
+
+    <label>Venue:</label>
+    <input type="text" id="venue" required />
+
+    <label>Score (Team A):</label>
+    <input type="number" id="scoreA" min="0" required />
+
+    <label>Score (Team B):</label>
+    <input type="number" id="scoreB" min="0" required />
+
+    <h3>Statistics</h3>
+    <label>Possession Team A (%):</label>
+    <input type="number" id="possA" min="0" max="100" required />
+
+    <label>Possession Team B (%):</label>
+    <input type="number" id="possB" min="0" max="100" required />
+
+    <label>Shots A - B:</label>
+    <input type="text" id="shots" placeholder="e.g. 7 - 5" required />
+
+    <label>Corners A - B:</label>
+    <input type="text" id="corners" placeholder="e.g. 3 - 2" required />
+
+    <label>Fouls A - B:</label>
+    <input type="text" id="fouls" placeholder="e.g. 4 - 6" required />
+
+    <label>Yellow Cards A - B:</label>
+    <input type="text" id="yellow" placeholder="e.g. 1 - 2" required />
+
+    <label>Red Cards A - B:</label>
+    <input type="text" id="red" placeholder="e.g. 0 - 1" required />
+
+    <label>Offsides A - B:</label>
+    <input type="text" id="offsides" placeholder="e.g. 2 - 3" required />
+
+    <label>Saves A - B:</label>
+    <input type="text" id="saves" placeholder="e.g. 3 - 5" required />
+
+    <h3>Team Lists and Scorers</h3>
+    <label>Team A Players (comma-separated):</label>
+    <textarea id="playersA" rows="2"></textarea>
+
+    <label>Team B Players (comma-separated):</label>
+    <textarea id="playersB" rows="2"></textarea>
+
+    <label>Scorers Team A (from players list):</label>
+    <input type="text" id="scorersA" placeholder="e.g. John, Mike" />
+
+    <label>Scorers Team B (from players list):</label>
+    <input type="text" id="scorersB" placeholder="e.g. Alex" />
+
+    <button type="submit">Save Match</button>
+  </form>
+
+  <div class="match-list">
+    <h2>All Matches</h2>
+    <div id="matches"></div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBK5UM0n8-GLvleW7l6B8Hi-_WuC64QA4U",
+      authDomain: "scores-b25a7.firebaseapp.com",
+      databaseURL: "https://scores-b25a7-default-rtdb.firebaseio.com",
+      projectId: "scores-b25a7",
+      storageBucket: "scores-b25a7.appspot.com",
+      messagingSenderId: "1001957936318",
+      appId: "1:1001957936318:web:90fdfb367f82f6a3d8e2ef"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const form = document.getElementById("matchForm");
+    const matchesDiv = document.getElementById("matches");
+
+    form.onsubmit = function(e) {
+      e.preventDefault();
+      const data = {
+        competition: form.competition.value,
+        type: form.matchType.value,
+        teamA: form.teamA.value,
+        teamB: form.teamB.value,
+        logoA: form.logoA.value,
+        logoB: form.logoB.value,
+        date: form.matchDate.value,
+        time: form.matchTime.value,
+        venue: form.venue.value,
+        scoreA: +form.scoreA.value,
+        scoreB: +form.scoreB.value,
+        stats: {
+          possession: form.possA.value + "% - " + form.possB.value + "%",
+          shots: form.shots.value,
+          corners: form.corners.value,
+          fouls: form.fouls.value,
+          yellow: form.yellow.value,
+          red: form.red.value,
+          offsides: form.offsides.value,
+          saves: form.saves.value
+        },
+        playersA: form.playersA.value,
+        playersB: form.playersB.value,
+        scorersA: form.scorersA.value,
+        scorersB: form.scorersB.value
+      };
+      const id = form.matchId.value || db.ref("matches").push().key;
+      db.ref("matches/" + id).set(data).then(() => {
+        form.reset();
+        form.matchId.value = "";
+        loadMatches();
+      });
+    };
+
+    function loadMatches() {
+      db.ref("matches").on("value", snap => {
+        matchesDiv.innerHTML = "";
+        snap.forEach(child => {
+          const m = child.val();
+          const div = document.createElement("div");
+          div.className = "match";
+          div.innerHTML = `
+            <strong>${m.competition}</strong> (${m.type})<br>
+            <img src="${m.logoA}" height="20"> ${m.teamA} ${m.scoreA} - ${m.scoreB} ${m.teamB} <img src="${m.logoB}" height="20"><br>
+            ${m.date} | ${m.time} | ${m.venue}<br>
+            Stats: ${m.stats.possession}, Shots: ${m.stats.shots}, Corners: ${m.stats.corners}, Fouls: ${m.stats.fouls}, YC: ${m.stats.yellow}, RC: ${m.stats.red}<br>
+            Scorers: ${m.scorersA} / ${m.scorersB}
+            <div class="actions">
+              <button onclick='editMatch("${child.key}")'>Edit</button>
+              <button onclick='deleteMatch("${child.key}")'>Delete</button>
+            </div>
+          `;
+          matchesDiv.appendChild(div);
+        });
+      });
+    }
+
+    function editMatch(id) {
+      db.ref("matches/" + id).once("value").then(snap => {
+        const m = snap.val();
+        form.matchId.value = id;
+        form.competition.value = m.competition;
+        form.matchType.value = m.type;
+        form.teamA.value = m.teamA;
+        form.teamB.value = m.teamB;
+        form.logoA.value = m.logoA;
+        form.logoB.value = m.logoB;
+        form.matchDate.value = m.date;
+        form.matchTime.value = m.time;
+        form.venue.value = m.venue;
+        form.scoreA.value = m.scoreA;
+        form.scoreB.value = m.scoreB;
+        const parts = m.stats.possession.split(" - ");
+        form.possA.value = parseInt(parts[0]);
+        form.possB.value = parseInt(parts[1]);
+        form.shots.value = m.stats.shots;
+        form.corners.value = m.stats.corners;
+        form.fouls.value = m.stats.fouls;
+        form.yellow.value = m.stats.yellow;
+        form.red.value = m.stats.red;
+        form.offsides.value = m.stats.offsides;
+        form.saves.value = m.stats.saves;
+        form.playersA.value = m.playersA;
+        form.playersB.value = m.playersB;
+        form.scorersA.value = m.scorersA;
+        form.scorersB.value = m.scorersB;
+      });
+    }
+
+    function deleteMatch(id) {
+      if (confirm("Delete this match?")) {
+        db.ref("matches/" + id).remove();
+      }
+    }
+
+    loadMatches();
+  </script>
+</body>
+</html>
