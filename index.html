@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Fixtures - Football League</title>
-  <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;700&family=Bebas+Neue&display=swap" rel="stylesheet"/>
   <style>
     body {
       font-family: 'Urbanist', sans-serif;
@@ -39,8 +39,10 @@
       border-radius: 50%;
     }
     header h1 {
-      font-size: 1.8rem;
+      font-size: 2rem;
       margin: 0;
+      font-family: 'Bebas Neue', sans-serif;
+      letter-spacing: 1px;
     }
     .filter-bar {
       display: flex;
@@ -71,8 +73,8 @@
       box-shadow: 0 6px 12px rgba(0,0,0,0.1);
       width: 300px;
       transition: all 0.3s ease;
-      cursor: pointer;
       padding: 15px;
+      text-align: center;
     }
     .fixture-card:hover {
       transform: translateY(-5px) scale(1.02);
@@ -96,17 +98,39 @@
     }
     .vs {
       font-weight: bold;
-      font-size: 1.3rem;
+      font-size: 1.5rem;
       color: #0f5132;
     }
     .match-info {
       font-size: 0.95rem;
       margin: 4px 0;
     }
+    .match-date { color: #e63946; font-weight: bold; }
+    .match-time { color: #457b9d; font-weight: bold; }
+    .match-venue { color: #6a4c93; }
     .competition {
       font-size: 0.85rem;
       color: #666;
       margin-top: 8px;
+      font-weight: bold;
+    }
+    .details-btn {
+      margin-top: 10px;
+      display: inline-block;
+      padding: 10px 18px;
+      font-size: 0.9rem;
+      font-weight: bold;
+      color: #fff;
+      background: linear-gradient(145deg, #0f5132, #1b8a5a);
+      border: none;
+      border-radius: 50px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.2), inset 0 2px 4px rgba(255,255,255,0.2);
+      transition: transform 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+    }
+    .details-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 12px rgba(0,0,0,0.3);
     }
     footer {
       text-align: center;
@@ -165,23 +189,23 @@
       matches.forEach(([id, match]) => {
         const card = document.createElement("div");
         card.className = "fixture-card";
-        card.onclick = () => window.location.href = `matches.html?id=${id}`;
         card.innerHTML = `
           <div class="club-logos">
             <div>
               <img src="${match.logoA || '#'}" alt="${match.teamA}"/>
-              <div>${match.teamA}</div>
+              <div style="color:#0f5132; font-weight:bold;">${match.teamA}</div>
             </div>
-            <div class="vs">vs</div>
+            <div class="vs">VS</div>
             <div>
               <img src="${match.logoB || '#'}" alt="${match.teamB}"/>
-              <div>${match.teamB}</div>
+              <div style="color:#d62828; font-weight:bold;">${match.teamB}</div>
             </div>
           </div>
-          <div class="match-info"><strong>Date:</strong> ${match.date}</div>
-          <div class="match-info"><strong>Time:</strong> ${match.time}</div>
-          <div class="match-info"><strong>Venue:</strong> ${match.venue}</div>
-          <div class="competition"><strong>${match.competition}</strong> (${match.type})</div>
+          <div class="match-info match-date">📅 ${match.date}</div>
+          <div class="match-info match-time">⏰ ${match.time}</div>
+          <div class="match-info match-venue">📍 ${match.venue}</div>
+          <div class="competition">${match.competition} (${match.type})</div>
+          <button class="details-btn" onclick="window.location.href='matches.html?id=${id}'">Match Details</button>
         `;
         fixtureContainer.appendChild(card);
       });
