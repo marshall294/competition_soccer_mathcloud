@@ -9,15 +9,54 @@
     body {
       font-family: 'Urbanist', sans-serif;
       margin: 0;
-      padding: 0;
-      background: #f8f9fa;
+      background: #f4f6f8;
+      color: #333;
     }
     header {
-      background: #0f5132;
+      background: linear-gradient(135deg, #0f5132, #198754);
       color: #fff;
-      padding: 20px;
+      padding: 15px;
       text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+    }
+    .logo-ring {
+      width: 60px;
+      height: 60px;
+      background: #fff;
+      border-radius: 50%;
+      border: 4px solid #ffd700;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.3), 0 4px 8px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo-ring img {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+    }
+    header h1 {
       font-size: 1.8rem;
+      margin: 0;
+    }
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      background: #fff;
+      padding: 15px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .filter-bar input {
+      padding: 8px 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      outline: none;
+      font-size: 0.95rem;
     }
     .fixture-container {
       display: flex;
@@ -28,51 +67,69 @@
     }
     .fixture-card {
       background: white;
-      border-radius: 12px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      border-radius: 15px;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.1);
       width: 300px;
+      transition: all 0.3s ease;
       cursor: pointer;
-      transition: transform 0.2s;
-      text-align: center;
       padding: 15px;
     }
     .fixture-card:hover {
-      transform: scale(1.03);
+      transform: translateY(-5px) scale(1.02);
+      box-shadow: 0 10px 18px rgba(0,0,0,0.2);
     }
     .club-logos {
       display: flex;
       justify-content: space-around;
       align-items: center;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
+    }
+    .club-logos div {
+      text-align: center;
     }
     .club-logos img {
-      width: 50px;
-      height: 50px;
+      width: 60px;
+      height: 60px;
       object-fit: contain;
+      border-radius: 50%;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
     .vs {
       font-weight: bold;
-      font-size: 1.2rem;
+      font-size: 1.3rem;
+      color: #0f5132;
     }
     .match-info {
-      font-size: 0.9rem;
-      margin: 5px 0;
+      font-size: 0.95rem;
+      margin: 4px 0;
     }
     .competition {
       font-size: 0.85rem;
-      color: #555;
-      margin-top: 10px;
+      color: #666;
+      margin-top: 8px;
     }
     footer {
       text-align: center;
       padding: 15px;
       font-size: 0.9rem;
       color: #555;
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
-  <header>🏆 Football Fixtures</header>
+  <header>
+    <div class="logo-ring">
+      <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSWYf5IMmgVS0OFoTZfrZwDjIsf3orTinmOzw&s" alt="League Logo"/>
+    </div>
+    <h1>Football Fixtures</h1>
+  </header>
+
+  <div class="filter-bar">
+    <input type="date" id="filterDate" />
+    <input type="text" id="filterTeam" placeholder="Search by team..." />
+  </div>
+
   <div class="fixture-container" id="fixtureContainer">Loading fixtures...</div>
   <footer>&copy; 2025 Football League</footer>
 
@@ -93,27 +150,22 @@
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-
     const fixtureContainer = document.getElementById("fixtureContainer");
-    fixtureContainer.innerHTML = "";
+    const filterDate = document.getElementById("filterDate");
+    const filterTeam = document.getElementById("filterTeam");
 
-    db.ref("matches").on("value", snapshot => {
+    let allMatches = [];
+
+    function renderMatches(matches) {
       fixtureContainer.innerHTML = "";
-      if (!snapshot.exists()) {
+      if (matches.length === 0) {
         fixtureContainer.innerHTML = "<p>No fixtures found.</p>";
         return;
       }
-
-      const matches = snapshot.val();
-      const sorted = Object.entries(matches).sort((a, b) => {
-        return new Date(a[1].date + "T" + a[1].time) - new Date(b[1].date + "T" + b[1].time);
-      });
-
-      sorted.forEach(([id, match]) => {
+      matches.forEach(([id, match]) => {
         const card = document.createElement("div");
         card.className = "fixture-card";
         card.onclick = () => window.location.href = `matches.html?id=${id}`;
-
         card.innerHTML = `
           <div class="club-logos">
             <div>
@@ -133,7 +185,33 @@
         `;
         fixtureContainer.appendChild(card);
       });
+    }
+
+    function applyFilters() {
+      const dateVal = filterDate.value;
+      const teamVal = filterTeam.value.toLowerCase();
+      const filtered = allMatches.filter(([id, match]) => {
+        const dateMatch = !dateVal || match.date === dateVal;
+        const teamMatch = !teamVal || match.teamA.toLowerCase().includes(teamVal) || match.teamB.toLowerCase().includes(teamVal);
+        return dateMatch && teamMatch;
+      });
+      renderMatches(filtered);
+    }
+
+    db.ref("matches").on("value", snapshot => {
+      if (!snapshot.exists()) {
+        fixtureContainer.innerHTML = "<p>No fixtures found.</p>";
+        return;
+      }
+      const matches = snapshot.val();
+      allMatches = Object.entries(matches).sort((a, b) => {
+        return new Date(a[1].date + "T" + a[1].time) - new Date(b[1].date + "T" + b[1].time);
+      });
+      applyFilters();
     });
+
+    filterDate.addEventListener("input", applyFilters);
+    filterTeam.addEventListener("input", applyFilters);
   </script>
 </body>
 </html>
