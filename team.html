@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Teams & Fixtures — Manual</title>
+  <style>
+    :root{--accent:#0d6efd;--muted:#6b7280}
+    body{font-family:Inter,system-ui,Arial;margin:0;background:#f4f6fb;color:#111}
+    header{background:var(--accent);color:#fff;padding:14px 18px;font-weight:700}
+    .wrap{max-width:1100px;margin:20px auto;padding:18px}
+    .card{background:#fff;border-radius:10px;padding:14px;box-shadow:0 6px 18px rgba(15,23,42,0.06);margin-bottom:16px}
+    form input, form select, form button {width:100%;padding:8px;margin:6px 0;border-radius:8px;border:1px solid #e6edf3}
+    .grid{display:grid;grid-template-columns:1fr 420px;gap:16px}
+    .teams-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+    .team-card{background:#f8fafc;padding:10px;border-radius:8px;text-align:center}
+    .team-card img{width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid #fff;box-shadow:0 4px 12px rgba(2,6,23,0.06)}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid #eef2f7;text-align:center}
+    th{background:#eef4ff}
+    .small{font-size:13px;color:var(--muted)}
+    .row-actions{display:flex;gap:6px;justify-content:center}
+    .btn{cursor:pointer;border:none;padding:8px 10px;border-radius:8px}
+    .btn-primary{background:#06b6d4;color:#062023}
+    .btn-danger{background:#ef4444;color:#fff}
+    @media(max-width:900px){.grid{grid-template-columns:1fr}}
+    .team-cell{display:flex;align-items:center;gap:8px}
+    .team-cell img{width:36px;height:36px;border-radius:50%;object-fit:cover}
+  </style>
+</head>
+<body>
+  <header>Teams & Fixtures — Manual Entry</header>
+  <div class="wrap">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h3>Teams (manual)</h3>
+          <form id="teamForm">
+            <input type="hidden" id="teamId" />
+            <label class="small">Team Name</label>
+            <input id="teamName" type="text" placeholder="e.g. Brazil" required />
+            <label class="small">Logo Image URL</label>
+            <input id="teamLogoUrl" type="url" placeholder="https://example.com/logo.png" />
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button class="btn btn-primary" type="submit">Save Team</button>
+              <button id="teamResetBtn" type="button" class="btn" style="background:#f3f4f6">Reset</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>Create / Update Fixture (manual)</h3>
+          <form id="fixtureForm">
+            <input type="hidden" id="fixtureId" />
+            <label class="small">Home Team</label>
+            <select id="homeTeam"></select>
+
+            <label class="small">Away Team</label>
+            <select id="awayTeam"></select>
+
+            <label class="small">Date & Time</label>
+            <input id="fixtureDate" type="datetime-local" />
+
+            <label class="small">Home Score (leave blank if not yet)</label>
+            <input id="homeScore" type="number" min="0" placeholder="e.g. 2" />
+
+            <label class="small">Away Score (leave blank if not yet)</label>
+            <input id="awayScore" type="number" min="0" placeholder="e.g. 1" />
+
+            <label class="small">Status</label>
+            <select id="fixtureStatus">
+              <option value="not_started">Not Started</option>
+              <option value="ongoing">Ongoing</option>
+              <option value="finished">Finished</option>
+            </select>
+
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button class="btn btn-primary" type="submit">Save Fixture</button>
+              <button id="fixtureResetBtn" type="button" class="btn" style="background:#f3f4f6">Reset</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>Fixtures</h3>
+          <table id="fixturesTable">
+            <thead>
+              <tr><th>Date</th><th>Home</th><th>Score</th><th>Away</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <aside>
+        <div class="card">
+          <h3>Team List</h3>
+          <div class="teams-grid" id="teamsGrid"></div>
+        </div>
+
+        <div class="card">
+          <h3>Quick Links</h3>
+          <p class="small">Use the <strong>League Table</strong> page to view the standings live.</p>
+          <a href="league-table.html" style="display:inline-block;margin-top:8px;text-decoration:none"><button class="btn btn-primary">Open League Table</button></a>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Firebase v9 modular -->
+<script type="module">
+  // Firebase imports
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+  import { 
+    getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc 
+  } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+
+  // Config
+  const firebaseConfig = {
+    apiKey: "AIzaSyAFsHg9fK6IDnHbuxmBleEfIIfVGsuLDik",
+    authDomain: "profile-b825d.firebaseapp.com",
+    projectId: "profile-b825d",
+    storageBucket: "profile-b825d.appspot.com",
+    messagingSenderId: "925276859161",
+    appId: "1:925276859161:web:194c60f6dbd9f1ef8bf388"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  const teamsCol = collection(db, 'teams');
+  const fixturesCol = collection(db, 'fixtures');
+
+  // UI refs
+  const teamForm = document.getElementById('teamForm');
+  const teamId = document.getElementById('teamId');
+  const teamName = document.getElementById('teamName');
+  const teamLogoUrl = document.getElementById('teamLogoUrl');
+  const teamResetBtn = document.getElementById('teamResetBtn');
+  const teamsGrid = document.getElementById('teamsGrid');
+
+  const fixtureForm = document.getElementById('fixtureForm');
+  const fixtureId = document.getElementById('fixtureId');
+  const homeTeamSel = document.getElementById('homeTeam');
+  const awayTeamSel = document.getElementById('awayTeam');
+  const fixtureDate = document.getElementById('fixtureDate');
+  const homeScore = document.getElementById('homeScore');
+  const awayScore = document.getElementById('awayScore');
+  const fixtureStatus = document.getElementById('fixtureStatus');
+  const fixtureResetBtn = document.getElementById('fixtureResetBtn');
+  const fixturesTableBody = document.querySelector('#fixturesTable tbody');
+
+  // Local caches
+  let teams = {};   
+  let fixtures = {}; 
+
+  // Helpers
+  function safeToDate(value) {
+    if (!value) return null;
+    if (typeof value.toDate === 'function') return value.toDate();
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // Teams: add / edit
+  teamForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const name = teamName.value.trim();
+      const logo = teamLogoUrl.value.trim();
+      if (!name) return alert('Team name required');
+
+      const id = teamId.value;
+      if (id) {
+        await updateDoc(doc(db, 'teams', id), { name, logoUrl: logo });
+      } else {
+        await addDoc(teamsCol, { name, logoUrl: logo });
+      }
+      teamForm.reset();
+      teamId.value = '';
+    } catch (err) {
+      console.error('Error saving team:', err);
+      alert('Error saving team — see console.');
+    }
+  });
+
+  teamResetBtn.addEventListener('click', () => {
+    teamForm.reset();
+    teamId.value = '';
+  });
+
+  // Fixtures: add / edit
+  fixtureForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const homeId = homeTeamSel.value;
+      const awayId = awayTeamSel.value;
+      if (!homeId || !awayId) return alert('Pick both teams');
+      if (homeId === awayId) return alert('Teams must be different');
+
+      const dateVal = fixtureDate.value ? new Date(fixtureDate.value).toISOString() : new Date().toISOString();
+      const hs = homeScore.value === '' ? null : parseInt(homeScore.value, 10);
+      const as = awayScore.value === '' ? null : parseInt(awayScore.value, 10);
+      const status = fixtureStatus.value || 'not_started';
+
+      const id = fixtureId.value;
+      const payload = {
+        homeTeamId: homeId,
+        awayTeamId: awayId,
+        date: dateVal,
+        homeScore: hs,
+        awayScore: as,
+        status
+      };
+
+      if (id) {
+        await updateDoc(doc(db, 'fixtures', id), payload);
+      } else {
+        await addDoc(fixturesCol, payload);
+      }
+      fixtureForm.reset();
+      fixtureId.value = '';
+    } catch (err) {
+      console.error('Error saving fixture:', err);
+      alert('Error saving fixture — see console.');
+    }
+  });
+
+  fixtureResetBtn.addEventListener('click', () => {
+    fixtureForm.reset();
+    fixtureId.value = '';
+  });
+
+  // Real-time: teams
+  onSnapshot(teamsCol, (snap) => {
+    teams = {};
+    teamsGrid.innerHTML = '';
+
+    homeTeamSel.innerHTML = '<option value="">Select home</option>';
+    awayTeamSel.innerHTML = '<option value="">Select away</option>';
+
+    snap.forEach(d => {
+      const data = { id: d.id, ...d.data() };
+      teams[d.id] = data;
+
+      const el = document.createElement('div');
+      el.className = 'team-card';
+
+      const img = document.createElement('img');
+      img.src = data.logoUrl || 'https://placehold.co/64';
+      img.alt = data.name || 'team';
+
+      const nameDiv = document.createElement('div');
+      nameDiv.style.fontWeight = '600';
+      nameDiv.style.marginTop = '6px';
+      nameDiv.textContent = data.name || 'Unnamed';
+
+      const actions = document.createElement('div');
+      actions.className = 'row-actions';
+      actions.style.marginTop = '8px';
+
+      const editBtn = document.createElement('button');
+      editBtn.className = 'btn';
+      editBtn.textContent = 'Edit';
+      editBtn.type = 'button';
+      editBtn.addEventListener('click', () => {
+        teamId.value = data.id;
+        teamName.value = data.name || '';
+        teamLogoUrl.value = data.logoUrl || '';
+        window.scrollTo({top:0,behavior:'smooth'});
+      });
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn btn-danger';
+      delBtn.textContent = 'Delete';
+      delBtn.type = 'button';
+      delBtn.addEventListener('click', async () => {
+        if (!confirm('Delete team? This will not automatically remove fixtures.')) return;
+        try {
+          await deleteDoc(doc(db, 'teams', data.id));
+        } catch (err) {
+          console.error('deleteTeam error', err);
+          alert('Error deleting team — see console.');
+        }
+      });
+
+      actions.appendChild(editBtn);
+      actions.appendChild(delBtn);
+
+      el.appendChild(img);
+      el.appendChild(nameDiv);
+      el.appendChild(actions);
+      teamsGrid.appendChild(el);
+
+      const o1 = document.createElement('option'); o1.value = d.id; o1.text = data.name || 'Unnamed';
+      const o2 = document.createElement('option'); o2.value = d.id; o2.text = data.name || 'Unnamed';
+      homeTeamSel.appendChild(o1); awayTeamSel.appendChild(o2);
+    });
+  });
+
+  // Real-time: fixtures
+  onSnapshot(fixturesCol, (snap) => {
+    fixturesTableBody.innerHTML = '';
+    fixtures = {};
+    snap.forEach(d => {
+      const f = { id: d.id, ...d.data() };
+      fixtures[d.id] = f;
+
+      const dateObj = safeToDate(f.date) || new Date();
+      const dateStr = dateObj.toLocaleString();
+
+      const homeName = (teams[f.homeTeamId] && teams[f.homeTeamId].name) || f.homeTeamId || 'N/A';
+      const awayName = (teams[f.awayTeamId] && teams[f.awayTeamId].name) || f.awayTeamId || 'N/A';
+      const hs = (f.homeScore == null) ? '' : f.homeScore;
+      const as = (f.awayScore == null) ? '' : f.awayScore;
+
+      const tr = document.createElement('tr');
+
+      const tdDate = document.createElement('td');
+      tdDate.textContent = dateStr;
+      tr.appendChild(tdDate);
+
+      const tdHome = document.createElement('td');
+      tdHome.style.textAlign = 'left';
+      const homeDiv = document.createElement('div');
+      homeDiv.className = 'team-cell';
+      const homeImg = document.createElement('img');
+      homeImg.src = (teams[f.homeTeamId] && teams[f.homeTeamId].logoUrl) || 'https://placehold.co/40';
+      const homeNameDiv = document.createElement('div');
+      homeNameDiv.style.marginLeft = '8px';
+      homeNameDiv.textContent = homeName;
+      homeDiv.appendChild(homeImg);
+      homeDiv.appendChild(homeNameDiv);
+      tdHome.appendChild(homeDiv);
+      tr.appendChild(tdHome);
+
+      const tdScore = document.createElement('td');
+      tdScore.textContent = `${hs} - ${as}`;
+      tr.appendChild(tdScore);
+
+      const tdAway = document.createElement('td');
+      tdAway.style.textAlign = 'left';
+      const awayDiv = document.createElement('div');
+      awayDiv.className = 'team-cell';
+      const awayImg = document.createElement('img');
+      awayImg.src = (teams[f.awayTeamId] && teams[f.awayTeamId].logoUrl) || 'https://placehold.co/40';
+      const awayNameDiv = document.createElement('div');
+      awayNameDiv.style.marginLeft = '8px';
+      awayNameDiv.textContent = awayName;
+      awayDiv.appendChild(awayImg);
+      awayDiv.appendChild(awayNameDiv);
+      tdAway.appendChild(awayDiv);
+      tr.appendChild(tdAway);
+
+      const tdStatus = document.createElement('td');
+      tdStatus.textContent = f.status || 'not_started';
+      tr.appendChild(tdStatus);
+
+      const tdActions = document.createElement('td');
+      const actionsWrap = document.createElement('div');
+      actionsWrap.className = 'row-actions';
+
+      const editFixtureBtn = document.createElement('button');
+      editFixtureBtn.className = 'btn';
+      editFixtureBtn.type = 'button';
+      editFixtureBtn.textContent = 'Edit';
+      editFixtureBtn.addEventListener('click', () => {
+        fixtureId.value = f.id;
+        homeTeamSel.value = f.homeTeamId || '';
+        awayTeamSel.value = f.awayTeamId || '';
+        const dObj = safeToDate(f.date);
+        fixtureDate.value = dObj ? dObj.toISOString().slice(0,16) : '';
+        homeScore.value = (f.homeScore == null) ? '' : f.homeScore;
+        awayScore.value = (f.awayScore == null) ? '' : f.awayScore;
+        fixtureStatus.value = f.status || 'not_started';
+        window.scrollTo({top:0,behavior:'smooth'});
+      });
+
+      const delFixtureBtn = document.createElement('button');
+      delFixtureBtn.className = 'btn btn-danger';
+      delFixtureBtn.type = 'button';
+      delFixtureBtn.textContent = 'Delete';
+      delFixtureBtn.addEventListener('click', async () => {
+        if (!confirm('Delete fixture?')) return;
+        try {
+          await deleteDoc(doc(db, 'fixtures', f.id));
+        } catch (err) {
+          console.error('deleteFixture error', err);
+          alert('Error deleting fixture — see console.');
+        }
+      });
+
+      actionsWrap.appendChild(editFixtureBtn);
+      actionsWrap.appendChild(delFixtureBtn);
+      tdActions.appendChild(actionsWrap);
+      tr.appendChild(tdActions);
+
+      fixturesTableBody.appendChild(tr);
+    });
+  });
+
+  window.__teams = teams;
+  window.__fixtures = fixtures;
+</script>
+
+</body>
+</html>

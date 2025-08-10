@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Teams & Fixtures</title>
+  <style>
+    :root{--accent:#0d6efd;--muted:#6b7280}
+    body{font-family:Inter,system-ui,Arial;margin:0;background:#f4f6fb;color:#111}
+    header{background:var(--accent);color:#fff;padding:14px 18px;font-weight:700}
+    .wrap{max-width:1100px;margin:20px auto;padding:18px}
+    .card{background:#fff;border-radius:10px;padding:14px;box-shadow:0 6px 18px rgba(15,23,42,0.06);margin-bottom:16px}
+    .grid{display:grid;grid-template-columns:1fr 420px;gap:16px}
+    .teams-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+    .team-card{background:#f8fafc;padding:10px;border-radius:8px;text-align:center}
+    .team-card img{width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid #fff;box-shadow:0 4px 12px rgba(2,6,23,0.06)}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid #eef2f7;text-align:center}
+    th{background:#eef4ff}
+    .small{font-size:13px;color:var(--muted)}
+    @media(max-width:900px){.grid{grid-template-columns:1fr}}
+    .team-cell{display:flex;align-items:center;gap:8px}
+    .team-cell img{width:36px;height:36px;border-radius:50%;object-fit:cover}
+  </style>
+</head>
+<body>
+  <header>Teams & Fixtures</header>
+  <div class="wrap">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h3>Fixtures</h3>
+          <table id="fixturesTable">
+            <thead>
+              <tr><th>Date</th><th>Home</th><th>Score</th><th>Away</th><th>Status</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <aside>
+        <div class="card">
+          <h3>Team List</h3>
+          <div class="teams-grid" id="teamsGrid"></div>
+        </div>
+
+        <div class="card">
+          <h3>Quick Links</h3>
+          <p class="small">Use the <strong>League Table</strong> page to view the standings live.</p>
+          <a href="league-table.html" style="display:inline-block;margin-top:8px;text-decoration:none"><button style="cursor:pointer;border:none;padding:8px 10px;border-radius:8px;background:#06b6d4;color:#062023">Open League Table</button></a>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+<!-- Firebase v9 modular -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+  import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAFsHg9fK6IDnHbuxmBleEfIIfVGsuLDik",
+    authDomain: "profile-b825d.firebaseapp.com",
+    projectId: "profile-b825d",
+    storageBucket: "profile-b825d.appspot.com",
+    messagingSenderId: "925276859161",
+    appId: "1:925276859161:web:194c60f6dbd9f1ef8bf388"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  const teamsCol = collection(db, 'teams');
+  const fixturesCol = collection(db, 'fixtures');
+
+  const teamsGrid = document.getElementById('teamsGrid');
+  const fixturesTableBody = document.querySelector('#fixturesTable tbody');
+
+  let teams = {};   
+
+  function safeToDate(value) {
+    if (!value) return null;
+    if (typeof value.toDate === 'function') return value.toDate();
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  onSnapshot(teamsCol, (snap) => {
+    teams = {};
+    teamsGrid.innerHTML = '';
+    snap.forEach(d => {
+      const data = { id: d.id, ...d.data() };
+      teams[d.id] = data;
+
+      const el = document.createElement('div');
+      el.className = 'team-card';
+      const img = document.createElement('img');
+      img.src = data.logoUrl || 'https://placehold.co/64';
+      img.alt = data.name || 'team';
+      const nameDiv = document.createElement('div');
+      nameDiv.style.fontWeight = '600';
+      nameDiv.style.marginTop = '6px';
+      nameDiv.textContent = data.name || 'Unnamed';
+
+      el.appendChild(img);
+      el.appendChild(nameDiv);
+      teamsGrid.appendChild(el);
+    });
+  });
+
+  onSnapshot(fixturesCol, (snap) => {
+    fixturesTableBody.innerHTML = '';
+    snap.forEach(d => {
+      const f = { id: d.id, ...d.data() };
+      const dateObj = safeToDate(f.date) || new Date();
+      const dateStr = dateObj.toLocaleString();
+      const homeName = (teams[f.homeTeamId] && teams[f.homeTeamId].name) || f.homeTeamId || 'N/A';
+      const awayName = (teams[f.awayTeamId] && teams[f.awayTeamId].name) || f.awayTeamId || 'N/A';
+      const hs = (f.homeScore == null) ? '' : f.homeScore;
+      const as = (f.awayScore == null) ? '' : f.awayScore;
+
+      const tr = document.createElement('tr');
+
+      const tdDate = document.createElement('td'); tdDate.textContent = dateStr; tr.appendChild(tdDate);
+      const tdHome = document.createElement('td'); tdHome.style.textAlign = 'left';
+      const homeDiv = document.createElement('div'); homeDiv.className = 'team-cell';
+      const homeImg = document.createElement('img');
+      homeImg.src = (teams[f.homeTeamId] && teams[f.homeTeamId].logoUrl) || 'https://placehold.co/40';
+      const homeNameDiv = document.createElement('div');
+      homeNameDiv.style.marginLeft = '8px';
+      homeNameDiv.textContent = homeName;
+      homeDiv.appendChild(homeImg);
+      homeDiv.appendChild(homeNameDiv);
+      tdHome.appendChild(homeDiv);
+      tr.appendChild(tdHome);
+
+      const tdScore = document.createElement('td'); tdScore.textContent = `${hs} - ${as}`; tr.appendChild(tdScore);
+      const tdAway = document.createElement('td'); tdAway.style.textAlign = 'left';
+      const awayDiv = document.createElement('div'); awayDiv.className = 'team-cell';
+      const awayImg = document.createElement('img');
+      awayImg.src = (teams[f.awayTeamId] && teams[f.awayTeamId].logoUrl) || 'https://placehold.co/40';
+      const awayNameDiv = document.createElement('div');
+      awayNameDiv.style.marginLeft = '8px';
+      awayNameDiv.textContent = awayName;
+      awayDiv.appendChild(awayImg);
+      awayDiv.appendChild(awayNameDiv);
+      tdAway.appendChild(awayDiv);
+      tr.appendChild(tdAway);
+
+      const tdStatus = document.createElement('td'); tdStatus.textContent = f.status || 'not_started'; tr.appendChild(tdStatus);
+      fixturesTableBody.appendChild(tr);
+    });
+  });
+</script>
+
+</body>
+</html>
